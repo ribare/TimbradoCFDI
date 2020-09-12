@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sat.gob.mx/cfd/3 http://www.sat.gob.mx/sitio_internet/cfd/3/cfdv33.xsd" Version="3.3" Fecha="2017-06-28T17:31:32" FormaPago="01" SubTotal="100.00" Total="96.00" Moneda="MXN" TipoDeComprobante="I" MetodoPago="PUE" LugarExpedicion="81200" Certificado="MIIDhDCCAmygAwIBAgIUMjAwMDEwMDAwMDAzMDAwMjI4MjMwDQYJKoZIhvcNAQEFBQAwSzEVMBMGA1UEAwwMQS5DLiBQcnVlYmFzMRAwDgYDVQQKDAdQcnVlYmFzMQswCQYDVQQGEwJNWDETMBEGA1UEBwwKQ3VhdWh0ZW1vYzAeFw0xNzA0MjgxODMwMzZaFw0yMjEwMTkxODMwMzZaMIGQMRswGQYDVQQDDBJQYWJsbyBOZXJ1ZGEgUGVyZXoxGzAZBgNVBCkMElBhYmxvIE5lcnVkYSBQZXJlejEbMBkGA1UECgwSUGFibG8gTmVydWRhIFBlcmV6MSUwIwYDVQQtDBxURVNUMDEwMjAzMDAxIC8gVEVTVDEwMzE3QTQ2MRAwDgYDVQQLDAdDRU5UUkFMMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4S8y29PfV6zBib8HEx/SK2XaUBeAb5YZbL+MHjX4K710kFdskgYhX35N0StfN5wbHLIsnj0eLtIk7gjXmaAjF6PkM9jtRtUrWgS22lcah0K7ws+nqfhNFuPX9rfm8SXzkBFDjUiBmW0U0Lz3cT/fEoJiqMxTwgJyhpuQ3vIcrv85cUaNpnf85eSCWVXGFmXpZD7EgXKLQulD1OOQbqcBPF6sK0wlz27HeQsM0X+2rO+RJvWAsHqIT4z0Sct4FFzj3XjGiF+DK8KxbQOmWpTnOSw0k9oKHmrFG3c1GxxyhvHoz+RurZFWPwuCWAzaUDhwq3uB6dtP7foeEjUUFlRD/wIDAQABoxowGDAJBgNVHRMEAjAAMAsGA1UdDwQEAwIGwDANBgkqhkiG9w0BAQUFAAOCAQEAl/4v3mCKfiwvPqmtFOnQ5HomJQq5W351gC5vKwP4vDKSdFDsvKtU5UMET6AnN6zHdI13AIZiOQQ8t1yv8RByMQ8dSHaoWaBkR0thzbK+Uol91Rp/TffNfneESAqvfBWKwXBTxGIxTNkJl5XXG5SyChRIan2sXvrSEGmfqxzzf3X5QFeQstRw80RbUWS21PGSgC9LMGkQVd76wqujP6P/QPjbYes5PD3xV0+6vbm3Q2NGj24s42I4Op2UEX+QjkTMd2o6FY2ek1zzcVjCyN2eNRgb/OKDjfiA/tyJ0HV1JxW3nc7BgIpRuHRI63NLWzIxe8233LgIf+y1oypT2W/o9Q==" NoCertificado="20001000000300022823" Folio="4" Serie="FPF" Sello="0dW2MD4MnPpvRknXbmqnVJrKUsXQa+VxOaOcSmNfkBL1ErCYyrxw6XFLfJs5i3PErIy/IH+8GboRHnLZ09UDSldFmZN36aoryeStpNcguvn8CceImy1rZKt7NK5MV6fT7FmF5+IjwcH7DRn/HVS9kPKq9kAryT0cIlU0aTcy/+CAjBqwjfRbAEdcJc0wK16FWb0fDReXJwAvp82youiVcldhorsi+O7nNivJ2clDi7Stt1Y9AZVuAz+KSPr3bdj+0ggdxnf9nWnwa4zFRGi3YmXOpwgO7x5BL2ie2t6kMN2mKlabKLabt2nj1bEr9Vp0/CwTDcv6As6zrNtUo9jR6Q==">
+	<cfdi:Emisor Rfc="TEST010203001" Nombre="EMPRESA PRUEBA PF" RegimenFiscal="612"/>
+	<cfdi:Receptor Rfc="TEST010203001" Nombre="RECEPTOR PRUEBA PF" UsoCFDI="P01"/>
+	<cfdi:Conceptos>
+		<cfdi:Concepto ClaveProdServ="14111506" ClaveUnidad="CLF" Cantidad="1" Unidad="No Aplica" Descripcion="PRUEBA CONCEPTO" ValorUnitario="100.00" Importe="100.00">
+			<cfdi:Impuestos>
+				<cfdi:Traslados>
+					<cfdi:Traslado Base="100.00" Impuesto="002" TipoFactor="Tasa" TasaOCuota="0.160000" Importe="16.00"/>
+				</cfdi:Traslados>
+				<cfdi:Retenciones>
+					<cfdi:Retencion Base="100.00" Impuesto="001" TipoFactor="Tasa" TasaOCuota="0.200000" Importe="20.00"/>
+				</cfdi:Retenciones>
+			</cfdi:Impuestos>
+		</cfdi:Concepto>
+	</cfdi:Conceptos>
+	<cfdi:Impuestos TotalImpuestosRetenidos="20.00" TotalImpuestosTrasladados="16">
+		<cfdi:Retenciones>
+			<cfdi:Retencion Impuesto="001" Importe="20.00"/>
+		</cfdi:Retenciones>
+		<cfdi:Traslados>
+			<cfdi:Traslado Impuesto="002" TasaOCuota="0.160000" TipoFactor="Tasa" Importe="16.00"/>
+		</cfdi:Traslados>
+	</cfdi:Impuestos>
+</cfdi:Comprobante>
