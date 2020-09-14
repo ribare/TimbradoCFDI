@@ -20,12 +20,16 @@ transform = ET.XSLT(xslt)
 cadena_original = transform(dom)
 #print(ET.tostring(newxml, pretty_print = True))
 #print(str(cadena_original))
+#file = open("cadena_original.txt", "w")
+#file.write(str(cadena_original))
 
 # ->> Sello
 key = RSA.load_key(PATH + "/certKey/key.pem")
 digest = hashlib.new('sha256', str(cadena_original).encode('utf-8')).digest()
 sello = base64.b64encode(key.sign(digest,"sha256"))
-print(sello.decode('utf-8'))
+#print(sello.decode('utf-8'))
+#file = open("sello.txt", "w")
+#file.write(sello.decode('utf-8'))
 
 # Para leer xml y pasarlo a String
 '''xml_file = open(PATH + "/XML_Ejemplo_33.xml","rb").read()
