@@ -27,7 +27,7 @@ cadena_original = transform(dom)
 key = RSA.load_key(PATH + "/certKey/key.pem")
 digest = hashlib.new('sha256', str(cadena_original).encode('utf-8')).digest()
 sello = base64.b64encode(key.sign(digest,"sha256"))
-#print(sello.decode('utf-8'))
+print(sello.decode('utf-8'))
 #file = open("sello.txt", "w")
 #file.write(sello.decode('utf-8'))
 
