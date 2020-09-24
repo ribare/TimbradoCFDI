@@ -5,7 +5,7 @@ import os
 import hashlib
 
 PATH = os.path.abspath(os.path.dirname(__file__))
-
+# 'B810FDB8-7E57-7E57-7E57-C6E0876DC543'
 # ->> Certificado a Base64
 '''cert_file = open(PATH + "\\certKey\\CertificadoFirmadoPF.cer","rb")  # r = read, b = binario
 cert = base64.b64encode(cert_file.read())
