@@ -11,15 +11,20 @@ PAC: Folios Digitales
 import cx_Oracle                # Para conexion a BD
 import zeep
 from zeep import Client         # Para el consusmo del WS
-import sys                      # Para leer parametros externos
 import base64                   
 import os                       # Funciones del SO
 import lxml.etree as ET         # Para lectura de XML
-from M2Crypto import RSA        # Para cargar llave
+import xml.etree.ElementTree as ELT
+#RESPALDO#from M2Crypto import RSA        # Para cargar llave
 import hashlib                  # Codificar cadena original sha256
 import time                     # Para Monitoreo
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import shutil
+
+from Crypto.PublicKey import RSA
+from Crypto.Hash import SHA256
+from Crypto.Signature import PKCS1_v1_5
 
 # Ruta absoluta
 PATH = os.path.abspath(os.path.dirname(__file__))
@@ -29,7 +34,7 @@ def procesarXML(ruta):
     # Certificado a Base64
     cert_file = open(PATH + "/certKey/CertificadoFirmadoPF.cer","rb")
     cert = base64.b64encode(cert_file.read())
-    certificado = cert.decode('utf-8')
+    string_cert = cert.decode('utf-8')
     #print (certificado)
 
     # Cadena Original
@@ -38,27 +43,48 @@ def procesarXML(ruta):
     xslt = ET.parse(PATH + "/xslt/cadenaoriginal_3_3.xslt")
     transform = ET.XSLT(xslt)
     cadena_original = transform(dom)
+    cadena_original = base64.b64encode(cadena_original)
     #print(str(cadena_original))
     
     # Sello
-    key = RSA.load_key(PATH + "/certKey/key.pem")
+    '''key = RSA.load_key(PATH + "/certKey/key.pem")
     digest = hashlib.new('sha256', str(cadena_original).encode('utf-8')).digest()
     sello = base64.b64encode(key.sign(digest,"sha256"))
     sello = sello.decode('utf-8')
-    #print(sello)
+    #print(sello)'''#Respaldo, v1
+    key = open (PATH + "/certKey/key.pem", "rb").read()
+    rsakey = RSA.importKey(key)
+    signer = PKCS1_v1_5.new(rsakey)
+    digest = SHA256.new()
+    digest.update(base64.b64decode(cadena_original))
+    sign = signer.sign(digest)
+    sello =base64.b64encode(sign)
+    sello = sello.decode('utf-8')
     
-    '''
+    # INICIO
+    #Se hace el llamado del namespace para que el XML este en formato correcto. 
+    ELT.register_namespace("cfdi","http://www.sat.gob.mx/cfd/3")
+    ELT.register_namespace("xs","http://www.w3.org/2001/XMLSchema")
+    ELT.register_namespace("xsi","http://www.w3.org/2001/XMLSchema-instance")
     
-    Agregar atributos a XML - RODRIGO
+    #Se abre el archivo con su respectiva ruta para la modificacion del xml por parte del certificado ----------------------------------------------------------------
+    tree = ELT.parse (ruta)
+    #Se consigue el root del archivo xml
+    root = tree.getroot()
     
-    '''
+    for edit_xml in root.iter('{http://www.sat.gob.mx/cfd/3}Comprobante'):
+        folio = edit_xml.get('Folio')
+        edit_xml.set('Certificado', string_cert)
+        edit_xml.set('Sello', sello)
+        tree.write(ruta, encoding='utf-8', xml_declaration=True)
+    # FIN
     
     # Timbrar
     rutaXML = ruta
-    timbrarCFDI(rutaXML)
+    timbrarCFDI(rutaXML, folio)
 
 
-def timbrarCFDI(rutaXML):
+def timbrarCFDI(rutaXML, folio):
     # Autenticacion WS
     usuario = "EPT040421D33"
     password = "contRa$3na"
@@ -81,21 +107,25 @@ def timbrarCFDI(rutaXML):
     #msgError = res['MensajeError']
     #mdgErrorDetalle = res['MensajeErrorDetallado']
     uuid = res['Timbre']['UUID']
+    xmlResultado = res['XMLResultado']
     
-    
-    '''
-    Extraer atributos
-    Agregar atributos de respuesta a XML - RODRIGO
-    Mover a carpeta Procesados si es OK
-    
-    '''
-    
-    # Llamar funcion para obtener PDF
     if codRespuesta == '0':
-        obtenerPDF(uuid, usuario, password, client)
+        # Sobreescribir XML - Respuesta SAT
+        file = rutaXML
+        with open(file, 'w') as filetowrite:
+            filetowrite.write(xmlResultado)
+        
+        # Mover a carpeta Procesados
+        shutil.move(rutaXML, './facturas/procesados/')
+        
+        # Obtener nombre archivo XML
+        filename = rutaXML.split('/')[3].split('.')[0]
+        
+        # Llamar funcion para obtener PDF
+        obtenerPDF(usuario, password, client, uuid, filename)
 
 
-def obtenerPDF(uuid, usuario, password, client):
+def obtenerPDF(usuario, password, client, uuid, filename):
     # Logo a Base64
     logo_file = open(PATH + "/images/erp_logo.png","rb")
     logo = base64.b64encode(logo_file.read())
@@ -105,8 +135,21 @@ def obtenerPDF(uuid, usuario, password, client):
     pdfRes = zeep.helpers.serialize_object(res)
     pdf = pdfRes['PDFResultado']
     pdfDecode = base64.b64decode(pdf)
-    with open(os.path.expanduser(PATH + '/facturas/procesados/test.pdf'), 'wb') as fout: #Cambiar nombre <<<---
+    with open(os.path.expanduser(PATH + '/facturas/procesados/' + filename +'.pdf'), 'wb') as fout:
         fout.write(pdfDecode)
+
+
+def dbOracle():
+    user = "CRPDTA"
+    password = "CRPDTA"
+
+    conn = cx_Oracle.connect(user, password, "172.31.31.136/DB910")
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT ABAN8, ABALPH FROM CRPDTA.F0101 MAXROW=15")
+
+    for ABAN8, ABALPH in cursor:
+        print (ABAN8, ABALPH)
 
 
 def monitoreo():
