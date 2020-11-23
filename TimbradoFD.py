@@ -189,7 +189,7 @@ def dbOracle(folio, uuid, codRespuesta, mensaje, filename):
     print (codRespuesta)
     print (mensaje)
     print (filename)
-    conn = cx_Oracle.connect(user, password, servicename) #172.31.31.136
+    conn = cx_Oracle.connect(user, password, servicename)
 
     cursor = conn.cursor()
     query = "UPDATE CRPDTA.F554256A SET FEK70ENUM=:uuid, FEAA15=:codR, FEADS1=:msg WHERE FEDOC=:folio"
