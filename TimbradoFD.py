@@ -4,6 +4,7 @@ de ERP Soluciones.
 PAC: Folios Digitales
 
             ****ERP Soluciones****
+    Develop by Ricardo B.R. & Rodrigo T.C.
 '''
 
 # Librerias
@@ -15,43 +16,45 @@ import base64
 import os                       # Funciones del SO
 import lxml.etree as ET         # Para lectura de XML
 import xml.etree.ElementTree as ELT
-#RESPALDO#from M2Crypto import RSA        # Para cargar llave
 import hashlib                  # Codificar cadena original sha256
-import time                     # Para Monitoreo
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-import shutil
-
-from Crypto.PublicKey import RSA
-from Crypto.Hash import SHA256
-from Crypto.Signature import PKCS1_v1_5
+import time                     # Monitoreo
+import shutil                   # Mover archivo
+from Crypto.PublicKey import RSA # Obtener sello
+from Crypto.Hash import SHA256  # Obtener sello
+from Crypto.Signature import PKCS1_v1_5 # Obtener sello
+from threading import Timer
+from configparser import ConfigParser # Leer archivo de configuración
+from datetime import datetime, date
 
 # Ruta absoluta
 PATH = os.path.abspath(os.path.dirname(__file__))
+
+# Leer archivo de configuración
+config_object = ConfigParser()
+config_object.read("conf/config.ini")
+
+def delay(ruta):
+    print("Procesando XML...")
+    t = Timer(1, procesarXML, [ruta])
+    t.start()
     
 def procesarXML(ruta):
-    
     # Certificado a Base64
-    cert_file = open(PATH + "/certKey/CertificadoFirmadoPF.cer","rb")
+    cert_file = open(PATH + "/certKey/certificado.cer","rb")
     cert = base64.b64encode(cert_file.read())
     string_cert = cert.decode('utf-8')
     #print (certificado)
-
+    
     # Cadena Original
     xml_file = open(ruta,"r")
     dom = ET.parse(xml_file)
-    xslt = ET.parse(PATH + "/xslt/cadenaoriginal_3_3.xslt")
+    xslt = ET.parse(PATH + "/xslt/cadenaoriginal.xslt")
     transform = ET.XSLT(xslt)
     cadena_original = transform(dom)
     cadena_original = base64.b64encode(cadena_original)
     #print(str(cadena_original))
     
     # Sello
-    '''key = RSA.load_key(PATH + "/certKey/key.pem")
-    digest = hashlib.new('sha256', str(cadena_original).encode('utf-8')).digest()
-    sello = base64.b64encode(key.sign(digest,"sha256"))
-    sello = sello.decode('utf-8')
-    #print(sello)'''#Respaldo, v1
     key = open (PATH + "/certKey/key.pem", "rb").read()
     rsakey = RSA.importKey(key)
     signer = PKCS1_v1_5.new(rsakey)
@@ -85,12 +88,17 @@ def procesarXML(ruta):
 
 
 def timbrarCFDI(rutaXML, folio):
+    print("Conectando a Folios Digitales...")
+    
+    # Obtener credenciales y URL del Web Service de config.ini
+    userinfo = config_object["WSINFO"]
+    
     # Autenticacion WS
-    usuario = ""
-    password = ""
+    usuario = userinfo["userfd"]
+    password = userinfo["passfd"]
 
     # Cliente WS Folios Digitales
-    wsdl = "https://app.foliosdigitalespac.com/WSTimbrado33Test/WSCFDI33.svc?WSDL"
+    wsdl = userinfo["urlfd"]
     client = Client(wsdl)
     
     # Leer xml y pasarlo a String
@@ -101,28 +109,54 @@ def timbrarCFDI(rutaXML, folio):
 
     # Timbrar
     response = client.service.TimbrarCFDI(usuario, password, cadena, referencia)
-    print(response)
+    #print(response)
+    #Serializar respuesta para obtener atributos
     res = zeep.helpers.serialize_object(response)
     codRespuesta = res['CodigoRespuesta']
-    #msgError = res['MensajeError']
-    #mdgErrorDetalle = res['MensajeErrorDetallado']
+    msgError = res['MensajeError']
+    msgErrorDetalle = res['MensajeErrorDetallado']
     uuid = res['Timbre']['UUID']
     xmlResultado = res['XMLResultado']
-    
+
     if codRespuesta == '0':
+        print("Factura " + folio + " Timbrada.\n")
+        
         # Sobreescribir XML - Respuesta SAT
         file = rutaXML
         with open(file, 'w') as filetowrite:
             filetowrite.write(xmlResultado)
         
+        # Copiar a carpeta de Attachment JDE
+        shutil.copy(rutaXML, '/u03/htmlupload/')
+        
         # Mover a carpeta Procesados
-        shutil.move(rutaXML, './facturas/procesados/')
+        shutil.move(rutaXML, '/efs/CFDI/procesados/')
         
         # Obtener nombre archivo XML
-        filename = rutaXML.split('/')[3].split('.')[0]
+        filename = rutaXML.split('/')[4].split('.')[0]
         
         # Llamar funcion para obtener PDF
         obtenerPDF(usuario, password, client, uuid, filename)
+        
+        # Actualizar F554256A
+        dbOracle(folio, uuid, codRespuesta, msgError, filename)
+    
+    elif codRespuesta == '801': 
+        # Ya fue Timbrada Anteriormente
+        print("Factura " + folio + " NO Timbrada. " + msgError + "\n")
+        
+    else:
+        # Error
+        msg = str(msgError) + " " + str(msgErrorDetalle)
+        print("Factura " + folio + " NO Timbrada. " + msg + "\n")
+        
+        # Mover a carpeta No Procesados
+        shutil.move(rutaXML, '/efs/CFDI/no_procesados/')
+        
+        # Actualizar F554256A con Error
+        uuid = 'N/A'
+        filename = 'N/A'
+        dbOracle(folio, uuid, codRespuesta, msg, filename)
 
 
 def obtenerPDF(usuario, password, client, uuid, filename):
@@ -135,48 +169,99 @@ def obtenerPDF(usuario, password, client, uuid, filename):
     pdfRes = zeep.helpers.serialize_object(res)
     pdf = pdfRes['PDFResultado']
     pdfDecode = base64.b64decode(pdf)
-    with open(os.path.expanduser(PATH + '/facturas/procesados/' + filename +'.pdf'), 'wb') as fout:
+    with open(os.path.expanduser('/efs/CFDI/procesados/' + filename +'.pdf'), 'wb') as fout:
         fout.write(pdfDecode)
+        
+    # Copiar a carpeta de Attachment JDE
+    rutaPDF = '/efs/CFDI/procesados/' + filename +'.pdf'
+    shutil.copy(rutaPDF, '/u03/htmlupload/')
 
 
-def dbOracle():
-    user = ""
-    password = ""
-
-    conn = cx_Oracle.connect(user, password, "127.0.0.1/ServiceName")
+def dbOracle(folio, uuid, codRespuesta, mensaje, filename):
+    # Obtener credenciales de config.ini
+    dbinfo = config_object["DBINFO"]
+    # Usuario, password y servicename
+    user = dbinfo["userdb"]
+    password = dbinfo["passdb"]
+    servicename = dbinfo["servname"]
+    print (folio)
+    print (uuid)
+    print (codRespuesta)
+    print (mensaje)
+    print (filename)
+    conn = cx_Oracle.connect(user, password, servicename) #172.31.31.136
 
     cursor = conn.cursor()
-    cursor.execute("SELECT ABAN8, ABALPH FROM CRPDTA.F0101")
-
-    for ABAN8, ABALPH in cursor:
-        print (ABAN8, ABALPH)
+    query = "UPDATE CRPDTA.F554256A SET FEK70ENUM=:uuid, FEAA15=:codR, FEADS1=:msg WHERE FEDOC=:folio"
+    cursor.execute(query, [uuid, codRespuesta, mensaje, folio])
+    conn.commit()
+    
+    if codRespuesta == '0':
+        # Attachments JDE
+        
+        select = 'SELECT FEKCOO, FEDOCO, FEDCTO FROM CRPDTA.F554256A WHERE FEDOC=:doc'
+        cursor.execute(select, doc = folio)
+        for row in cursor:
+            ## print (row[0])
+            KCOO = row[0]
+            DOCO = row[1]
+            DCTO = row[2]
+            DOCOSTR = str(DOCO)
+        
+        OBNM = 'GT554256A'
+        TXKY = KCOO + '|' + DOCOSTR + '|' + DCTO
+        TYPE = 5
+        USER = 'JFLORES'
+        # Hora actual
+        now = datetime.now()
+        time = now.strftime("%H%M%S")
+        TDAY = time
+        # Fecha actual Juliana
+        siglo = "1"
+        # Año
+        now = date.today()
+        year = now.strftime("%y")
+        # Día
+        dt = str(date.today())
+        sdtdate = datetime.strptime(dt, "%Y-%m-%d")
+        sdtdate = sdtdate.timetuple()
+        day = sdtdate.tm_yday
+        UPMJ = siglo + str(year) + str(day)
+        NAME = filename + '.xml'
+        FILENAME = "\\\\ERPDEPE1A\E910\MEDIAOBJ\HTMLUpload" + "\\" + NAME
+        NAME2 = filename + '.pdf'
+        FILENAME2 = "\\\\ERPDEPE1A\E910\MEDIAOBJ\HTMLUpload" + "\\" + NAME2
+        
+        insertXML = 'INSERT INTO CRPDTA.F00165 (GDOBNM, GDTXKY, GDMOSEQN, GDGTMOTYPE, GDUSER, GDUPMJ, GDTDAY, GDGTITNM, GDGTFILENM) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9)'
+        cursor.execute(insertXML, [OBNM, TXKY, 1, TYPE, USER, UPMJ, TDAY, NAME, FILENAME])
+        
+        insertPDF = 'INSERT INTO CRPDTA.F00165 (GDOBNM, GDTXKY, GDMOSEQN, GDGTMOTYPE, GDUSER, GDUPMJ, GDTDAY, GDGTITNM, GDGTFILENM) VALUES (:1, :2, :3, :4, :5, :6, :7, :8, :9)'
+        cursor.execute(insertPDF, [OBNM, TXKY, 2, TYPE, USER, UPMJ, TDAY, NAME2, FILENAME2])
+        
+    conn.commit()
+    conn.close()
 
 
 def monitoreo():
-    # Se ejecuta cuando encuentra nuevo archivo
-    def on_created(event):
-        print(f"{event.src_path} ha sido creado")
-        procesarXML(event.src_path)
-        
-    # Event handler - notifica cuando haya un cambio filesystem
-    if __name__ == "__main__":
-        # Controlador de eventos
-        event_handler = FileSystemEventHandler()
-        # Especifica que evento ejecutar
-        event_handler.on_created = on_created
-        # Observer
-        path = "./facturas/no_procesados/"
-        observer = Observer()
-        observer.schedule(event_handler, path, recursive=True)
-        #Start
-        observer.start()
-        try:
-            print("Monitoreando")
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            observer.stop()
-            observer.join()
-
+    watchdir = '/efs/CFDI/TimbradoCFDI/'
+    contents = os.listdir(watchdir)
+    print("Monitoreando")
+    while True:
+        newcontents = os.listdir(watchdir)
+        added = set(newcontents).difference(contents)
+        if added:
+            print ("Nuevo archivo añadido: %s" %(" ".join(added)))
+            delay(watchdir + "%s" %(" ".join(added)))
+            time.sleep(3)
+        else:
+            for filename in contents:
+                if filename.endswith('.xml'):
+                    print('Archivo en carpeta')
+                    delay(watchdir + filename)
+                    time.sleep(3)
+                    
+        contents = os.listdir(watchdir)
+        time.sleep(3)
+  
 # Ejecutar
 monitoreo()
