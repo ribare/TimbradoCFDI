@@ -86,8 +86,8 @@ def procesarXML(ruta):
 
 def timbrarCFDI(rutaXML, folio):
     # Autenticacion WS
-    usuario = "EPT040421D33"
-    password = "contRa$3na"
+    usuario = ""
+    password = ""
 
     # Cliente WS Folios Digitales
     wsdl = "https://app.foliosdigitalespac.com/WSTimbrado33Test/WSCFDI33.svc?WSDL"
@@ -140,13 +140,13 @@ def obtenerPDF(usuario, password, client, uuid, filename):
 
 
 def dbOracle():
-    user = "CRPDTA"
-    password = "CRPDTA"
+    user = ""
+    password = ""
 
-    conn = cx_Oracle.connect(user, password, "172.31.31.136/DB910")
+    conn = cx_Oracle.connect(user, password, "127.0.0.1/ServiceName")
 
     cursor = conn.cursor()
-    cursor.execute("SELECT ABAN8, ABALPH FROM CRPDTA.F0101 MAXROW=15")
+    cursor.execute("SELECT ABAN8, ABALPH FROM CRPDTA.F0101")
 
     for ABAN8, ABALPH in cursor:
         print (ABAN8, ABALPH)
